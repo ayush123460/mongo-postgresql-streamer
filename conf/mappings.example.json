@@ -1,0 +1,18 @@
+{
+	"DATABASE_NAME": {
+		"users": {
+			"source": "user",
+			"pk": "id",
+			"_id": {
+				"dest": "id",
+				"type": "TEXT"
+			},
+			"name": {
+				"type": "TEXT"
+			},
+			"comments": {
+				"type": "JSONB"
+			}
+		}
+	}
+}

@@ -1,0 +1,9 @@
+mongo.admin.database: "test"
+spring.datasource.url: "jdbc:postgresql://localhost:5432/DATABASE_NAME"
+spring.datasource.username: "PG_USERNAME"
+spring.datasource.password: "PG_PASSWORD"
+spring.datasource.platform: "postgresql"
+mongo.connector.identifer: "streamer"
+mongo.connector.forcereimport: false
+mappings: "mappings.json"
+mongo.uri: "mongodb://localhost:27017/"
