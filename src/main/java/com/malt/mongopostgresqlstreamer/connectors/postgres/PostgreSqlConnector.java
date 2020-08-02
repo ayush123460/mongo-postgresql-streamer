@@ -15,6 +15,13 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.github.wnameless.json.flattener.JsonFlattener;
+import com.github.wnameless.json.unflattener.JsonUnflattener;
+import org.postgresql.util.PGobject;
+
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -95,6 +102,18 @@ public class PostgreSqlConnector implements Connector {
     @Override
     public void upsert(String mappingName, FlattenMongoDocument document, DatabaseMapping mappings) {
         TableMapping tableMapping = getTableMappingOrFail(mappingName, mappings);
+
+        tableMapping.getFieldMappings().forEach(field -> {
+            if (field.getType().equals("JSONB") || field.getType().equals("JSON")) {
+                document.setValues(
+                    mapJson(
+                        document.getValues(),
+                        field.getSourceName()
+                    )
+                );
+            }
+        });
+
         List<Field> mappedFields = keepOnlyMappedFields(document, tableMapping);
 
         // Ensure that the primary key is here when we want to insert the `document`.
@@ -171,6 +190,17 @@ public class PostgreSqlConnector implements Connector {
         String destinationName = tableMapping.getDestinationName();
         documents
                 .forEach(document -> {
+                    tableMapping.getFieldMappings().forEach(field -> {
+                        if (field.getType().equals("JSONB") || field.getType().equals("JSON")) {
+                            document.setValues(
+                                mapJson(
+                                    document.getValues(),
+                                    field.getSourceName()
+                                )
+                            );
+                        }
+                    });
+
                     int nbInsertions = importDocument(document, mappings, tableMapping, parentMapping);
 
                     int tmpCounter = counter.addAndGet(nbInsertions);
@@ -394,6 +424,10 @@ public class PostgreSqlConnector implements Connector {
             return value != null;
         }
 
+        if (upperType.equals("BIGINT")) {
+            return Integer.parseInt(value.toString());
+        }
+
         if (upperType.startsWith("DOUBLE PRECISION") && value instanceof String) {
             return new BigDecimal((String) value);
         }
@@ -402,7 +436,6 @@ public class PostgreSqlConnector implements Connector {
         if (upperType.equals("TEXT") || upperType.startsWith("VARCHAR") && !(value instanceof String)) {
             return value == null ? value : value.toString();
         }
-
         return value;
     }
 
@@ -415,5 +448,31 @@ public class PostgreSqlConnector implements Connector {
     private TableMapping getTableMappingOrFail(String mappingName, DatabaseMapping mappings) {
         return mappings.get(mappingName)
                 .orElseThrow(() -> new RuntimeException("No defined mapping for mappingName " + mappingName + "."));
+    }
+
+    private Map<String, Object> mapJson(Map<String, Object> map, String source) {
+        JsonObject ob = new JsonParser().parse(
+            JsonUnflattener.unflatten(
+                new Gson().toJson(map)
+            )
+        )
+        .getAsJsonObject();
+        
+        JsonFlattener.flattenAsMap(ob.get(source).toString()).forEach((k, v) -> {
+            map.remove(source + "." + k);
+        });
+
+        PGobject p = new PGobject();
+
+        try {
+            p.setType("json");
+            p.setValue(ob.get(source).toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        map.put(source, p);
+        
+        return map;
     }
 }
