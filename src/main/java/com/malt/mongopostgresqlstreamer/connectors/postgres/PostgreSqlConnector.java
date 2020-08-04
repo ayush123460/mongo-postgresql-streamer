@@ -425,7 +425,7 @@ public class PostgreSqlConnector implements Connector {
         }
 
         if (upperType.equals("BIGINT") || upperType.equals("INT")) {
-            return Integer.parseInt(value.toString());
+            return Long.parseLong(value.toString(), 10);
         }
 
         if (upperType.startsWith("DOUBLE PRECISION") && value instanceof String) {
